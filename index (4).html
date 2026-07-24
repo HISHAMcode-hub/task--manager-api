@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bank Netbanking Project Manager</title>
+  <style>
+    :root { color-scheme: light; --primary:#155eef; --ink:#172033; --muted:#61708a; --card:#ffffff; --bg:#eef4ff; --ok:#12805c; --warn:#b54708; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:linear-gradient(135deg,#eef4ff,#f8fbff); color:var(--ink); }
+    header { padding:32px 24px; background:#0f2147; color:white; }
+    header h1 { margin:0 0 8px; font-size:clamp(28px,4vw,46px); }
+    header p { margin:0; color:#c7d7fe; max-width:900px; }
+    main { width:min(1180px,94vw); margin:24px auto 48px; display:grid; gap:20px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px; }
+    .card { background:var(--card); border:1px solid #d9e3f4; border-radius:18px; padding:20px; box-shadow:0 12px 28px rgba(15,33,71,.08); }
+    h2 { margin:0 0 14px; font-size:20px; }
+    label { display:block; margin:10px 0 6px; color:var(--muted); font-size:13px; font-weight:700; }
+    input, select, textarea { width:100%; border:1px solid #c7d7ea; border-radius:10px; padding:10px 12px; font:inherit; background:#fff; }
+    textarea { min-height:74px; resize:vertical; }
+    button { margin-top:12px; border:0; border-radius:999px; background:var(--primary); color:#fff; padding:10px 16px; font-weight:800; cursor:pointer; }
+    button.secondary { background:#e8efff; color:#174ea6; }
+    ul { padding-left:18px; margin:8px 0 0; }
+    li { margin:8px 0; }
+    .progress { height:18px; border-radius:999px; overflow:hidden; background:#dbe7fb; }
+    .bar { height:100%; width:0; background:linear-gradient(90deg,#12b76a,#155eef); transition:.3s; }
+    .pill { display:inline-block; padding:4px 9px; border-radius:999px; background:#eef4ff; color:#174ea6; font-size:12px; font-weight:800; }
+    .notice { color:var(--warn); font-weight:700; }
+    .done { color:var(--ok); font-weight:700; }
+    .split { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+    .messages { max-height:240px; overflow:auto; border:1px solid #e4ebf7; border-radius:12px; padding:10px; background:#fbfdff; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Bank Netbanking Project Manager</h1>
+  <p>Track roadmap goals, members, allocated tasks, deadlines, progress, reminders, and team chat for the Java Bank Management System project.</p>
+</header>
+<main>
+  <section class="card">
+    <div class="split"><h2>Project progress</h2><span id="progressText" class="pill">Loading…</span></div>
+    <div class="progress"><div id="progressBar" class="bar"></div></div>
+    <p id="projectName"></p>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Add member</h2>
+      <label>Name</label><input id="memberName" placeholder="Member name">
+      <label>Email</label><input id="memberEmail" placeholder="member@example.com">
+      <label>Role</label><input id="memberRole" placeholder="Backend Developer">
+      <button onclick="addMember()">Add member</button>
+    </div>
+
+    <div class="card">
+      <h2>Allocate task</h2>
+      <label>Title</label><input id="taskTitle" placeholder="Build transfer API">
+      <label>Description</label><textarea id="taskDescription"></textarea>
+      <label>Assignee ID</label><input id="taskAssignee" type="number" value="1">
+      <label>Deadline</label><input id="taskDeadline" type="date">
+      <label>Completion guide</label><textarea id="taskGuide" placeholder="Steps to complete this work"></textarea>
+      <button onclick="addTask()">Create task</button>
+    </div>
+
+    <div class="card">
+      <h2>Admin goal</h2>
+      <p class="pill">Login: admin@hisham / 786</p>
+      <label>Goal title</label><input id="goalTitle" placeholder="Finish UAT">
+      <label>Description</label><textarea id="goalDescription"></textarea>
+      <button onclick="addGoal()">Add goal as admin</button>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card"><h2>Members</h2><ul id="members"></ul></div>
+    <div class="card"><h2>Goals</h2><ul id="goals"></ul></div>
+    <div class="card"><h2>Deadline notifications</h2><ul id="notifications"></ul></div>
+  </section>
+
+  <section class="card">
+    <h2>Tasks</h2>
+    <ul id="tasks"></ul>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Project roadmap template</h2>
+      <ol id="roadmap"></ol>
+    </div>
+    <div class="card">
+      <h2>Team chat</h2>
+      <div id="messages" class="messages"></div>
+      <label>Your name</label><input id="chatAuthor" placeholder="Aisha">
+      <label>Message</label><textarea id="chatMessage" placeholder="Share an update"></textarea>
+      <button onclick="sendChat()">Send message</button>
+    </div>
+  </section>
+</main>
+<script>
+const api = path => `/api${path}`;
+const json = (url, options={}) => fetch(url, {headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options}).then(r => r.json());
+
+async function refresh() {
+  const project = await json(api('/project'));
+  document.getElementById('projectName').textContent = `${project.projectName} • ${project.domain}`;
+  document.getElementById('progressText').textContent = `${project.progressPercent}% complete`;
+  document.getElementById('progressBar').style.width = `${project.progressPercent}%`;
+  fill('members', project.members, m => `#${m.id} ${m.name} — ${m.role} (${m.email})`);
+  fill('goals', project.goals, g => `${g.completed ? '✅' : '🎯'} ${g.title}: ${g.description}`);
+  fill('notifications', project.notifications, n => n, 'No deadline reminders right now.');
+  fill('roadmap', project.roadmap, r => r);
+  fill('tasks', project.tasks, taskTemplate);
+  const messages = await json(api('/chat'));
+  document.getElementById('messages').innerHTML = messages.map(m => `<p><b>${escapeHtml(m.author)}</b>: ${escapeHtml(m.message)}<br><small>${m.sentAt}</small></p>`).join('') || '<p>No messages yet.</p>';
+}
+
+function fill(id, items, render, empty='Nothing added yet.') {
+  document.getElementById(id).innerHTML = items.length ? items.map(item => `<li>${escapeHtml(render(item))}</li>`).join('') : `<li>${empty}</li>`;
+}
+function taskTemplate(t) { return `#${t.id} ${t.title} — ${t.status} — assignee ${t.assigneeId ?? 'none'} — due ${t.deadline ?? 'not set'} — guide: ${t.completionGuide ?? ''}`; }
+function escapeHtml(value) { return String(value).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function addMember() {
+  await json(api('/members'), {method:'POST', body:JSON.stringify({name:memberName.value, email:memberEmail.value, role:memberRole.value})});
+  memberName.value = memberEmail.value = memberRole.value = '';
+  refresh();
+}
+async function addTask() {
+  await json(api('/tasks'), {method:'POST', body:JSON.stringify({title:taskTitle.value, description:taskDescription.value, status:'TODO', assigneeId:taskAssignee.value, deadline:taskDeadline.value, completionGuide:taskGuide.value})});
+  taskTitle.value = taskDescription.value = taskGuide.value = '';
+  refresh();
+}
+async function addGoal() {
+  await json(api('/admin/goals'), {method:'POST', headers:{'X-Admin-Username':'admin@hisham','X-Admin-Password':'786'}, body:JSON.stringify({title:goalTitle.value, description:goalDescription.value, completed:false})});
+  goalTitle.value = goalDescription.value = '';
+  refresh();
+}
+async function sendChat() {
+  await json(api('/chat'), {method:'POST', body:JSON.stringify({author:chatAuthor.value, message:chatMessage.value})});
+  chatMessage.value = '';
+  refresh();
+}
+refresh();
+</script>
+</body>
+</html>
